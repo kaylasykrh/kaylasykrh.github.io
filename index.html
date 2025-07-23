@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Space Canvas</title>
+  <style>
+    :root {
+      --color-bg: #e1e7ef;
+      --color-white: #fff;
+      --color-border: #ddd;
+      --color-border-light: #ccc;
+      --color-shadow: rgba(0, 0, 0, 0.1);
+      --color-shadow-strong: rgba(0, 0, 0, 0.15);
+      --color-shadow-sidebar: rgba(0, 0, 0, 0.2);
+      --color-shadow-card: rgba(0,0,0,0.07);
+      --color-placeholder: #e9e9e9;
+      --color-text: #222;
+      --color-text-light: #666;
+      --color-link: #7a8a99;
+      --color-overlay: rgba(0, 0, 0, 0.3);
+      --color-ui-bg: rgba(255,255,255,0.9);
+      --font-main: system-ui, sans-serif;
+      --font-size-base: 1rem;
+      --font-size-small: 0.9rem;
+      --font-size-xsmall: 0.85rem;
+      --radius-small: 4px;
+      --radius-medium: 6px;
+      --radius-large: 8px;
+      --radius-xlarge: 16px;
+      --padding-base: 8px;
+      --padding-small: 4px;
+      --padding-large: 12px;
+      --sidebar-width: 640px;
+      --logo-size: 24px;
+      --transition-fast: 0.25s;
+      --shadow-node: 0 4px 12px rgba(0, 0, 0, 0.08);
+      --shadow-default: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+    }
+
+    /* Layout & Base */
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;
+      font-family: var(--font-main);
+      font-size: var(--font-size-base);
+      color: var(--color-text);
+      background: var(--color-bg);
+    }
+    #app {
+      height: 100%;
+      width: 100%;
+    }
+
+    /* Canvas */
+    .canvas-wrapper {
+      position: relative;
+      height: 100%;
+      width: 100%;
+      background: var(--color-bg);
+      cursor: grab;
+    }
+    .canvas-content {
+      position: absolute;
+      top: 0;
+      left: 0;
+      transform: translate(var(--tx, 0), var(--ty, 0)) scale(var(--scale, 1));
+      transform-origin: 0 0;
+    }
+
+    /* Nodes */
+    .node {
+      position: absolute;
+      box-sizing: border-box;
+    }
+    .text-node {
+      background: var(--color-white);
+      padding: var(--padding-base) calc(var(--padding-base) * 1.5);
+      border-radius: 999px;
+      max-width: 200px;
+      min-width: 120px;
+      font-size: var(--font-size-base);
+      box-shadow: var(--shadow-default);
+      display: flex;
+      align-items: center;
+    }
+    .text-node span {
+      min-width: 0;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      display: inline-block;
+      flex: 1 1 0%;
+    }
+    .text-node svg {
+      flex-shrink: 0;
+    }
+    .text-node:hover {
+      cursor: pointer;
+    }
+    .image-node {
+      filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1));
+    }
+    .image-node img {
+      display: block;
+      max-width: 100%;
+      border-radius: 0;
+    }
+    .iframe-placeholder {
+      width: 200px;
+      height: 120px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: var(--font-size-small);
+      color: var(--color-text-light);
+      background: var(--color-placeholder);
+      border-radius: var(--radius-medium);
+    }
+    .weblink-node {
+      width: 240px;
+      min-height: 220px;
+      display: flex;
+      flex-direction: column;
+      border-radius: var(--radius-large);
+      box-shadow: var(--shadow-default);
+      background: var(--color-white);
+      border: 1px solid #EFEFEF;
+      text-decoration: none;
+      color: inherit;
+      overflow: hidden;
+      position: absolute;
+      box-sizing: border-box;
+      font-family: var(--font-main);
+    }
+    .weblink-node img.preview {
+      width: 100%;
+      height: 120px;
+      object-fit: cover;
+      border-radius: var(--radius-large) var(--radius-large) 0 0;
+      display: block;
+    }
+    .weblink-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 12px 16px 14px 16px;
+      background: transparent;
+    }
+    .weblink-title {
+      font-weight: 600;
+      font-size: 1rem;
+      line-height: 1.2;
+      margin-bottom: 8px;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-height: 2.4em;
+    }
+    .weblink-domain {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.95rem;
+      color: var(--color-link);
+      font-weight: 500;
+    }
+    .weblink-favicon {
+      width: 20px;
+      height: 20px;
+      border-radius: 4px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+      background: #f7f9fb;
+      flex-shrink: 0;
+    }
+    .inline-text-node {
+      background: var(--color-white);
+      border-radius: var(--radius-medium);
+      padding: var(--padding-base) calc(var(--padding-base) * 1.5);
+      font-size: var(--font-size-base);
+      min-width: 120px;
+      max-width: 200px;
+      box-shadow: var(--shadow-default);
+      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .iframe-node {
+      box-shadow: var(--shadow-default);
+      overflow: hidden;
+    }
+
+    /* Connections */
+    svg.connections {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* UI Layer */
+    .ui-layer {
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 100;
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: max-content auto;
+      gap: 8px;
+      padding: var(--padding-base) var(--padding-large);
+    }
+    .title-btn {
+      background: none;
+      border: none;
+      font-size: 1.1rem;
+      cursor: pointer;
+      padding: var(--padding-small) var(--padding-base);
+      pointer-events: auto;
+    }
+    .logo {
+      width: var(--logo-size);
+      height: var(--logo-size);
+      pointer-events: auto;
+    }
+
+    /* Space Dialog */
+    .space-dialog-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+    }
+    .space-dialog {
+      position: absolute;
+      top: 42px;
+      left: 12px;
+      background: var(--color-white);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-large);
+      padding: var(--padding-large);
+      min-width: 240px;
+      box-shadow: 0 4px 8px var(--color-shadow-strong);
+    }
+
+    /* Sidebar */
+    .sidebar-overlay {
+      position: fixed;
+      inset: 0;
+      background: var(--color-overlay);
+      z-index: 190;
+    }
+    .sidebar {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: var(--sidebar-width);
+      min-height: calc(100vh - 16px);
+      max-height: calc(100vh - 16px);
+      height: auto;
+      background: var(--color-white);
+      box-shadow: var(--shadow-default);
+      padding: 16px;
+      overflow-y: auto;
+      animation: slide-in var(--transition-fast) ease-out;
+      border-radius: 16px;
+      z-index: 200;
+    }
+    @keyframes slide-in {
+      from { transform: translateX(100%); }
+      to { transform: translateX(0); }
+    }
+    .close-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: none;
+      border: none;
+      font-size: 1.2rem;
+      cursor: pointer;
+    }
+
+    .tiptap-weblink {
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      background: #fafbfc;
+      padding: 16px 18px 14px 18px;
+      margin: 14px 0;
+      display: block;
+      max-width: 520px;
+      text-decoration: none;
+      color: inherit;
+      transition: box-shadow 0.15s;
+    }
+    .tiptap-weblink-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    .tiptap-weblink-description {
+      font-size: 1rem;
+      color: #444;
+      margin-bottom: 10px;
+    }
+    .tiptap-weblink-url {
+      font-size: 0.98rem;
+      color: #7a8a99;
+      font-weight: 400;
+      margin-top: 2px;
+      word-break: break-all;
+    }
+    .tiptap-image {
+      display: block;
+      max-width: 100%;
+      margin: 18px 0;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+    .empty-note-helper {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 120px;
+      color: #888;
+      font-size: 1.1em;
+    }
+    .ui-logo-box {
+      width: 56px;
+      height: 56px;
+      background: #fff;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: var(--shadow-default);
+      flex-shrink: 0;
+    }
+    .ui-logo {
+      width: 32px;
+      height: 32px;
+      display: block;
+    }
+    .ui-info-card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: var(--shadow-default);
+      padding: 28px 36px 28px 32px;
+      min-width: 340px;
+      max-width: 480px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      align-items: flex-start;
+    }
+    .ui-info-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .ui-username {
+      font-size: 1.15rem;
+      color: #666;
+      font-weight: 500;
+      letter-spacing: 0.01em;
+    }
+    .ui-space-title {
+      font-size: 1.45rem;
+      font-weight: 600;
+      color: #333;
+      margin-top: 8px;
+      margin-bottom: 0;
+    }
+    .ui-space-desc {
+      font-size: 1.15rem;
+      color: #444;
+      margin-top: 8px;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script id="space-data" type="application/json">{"id":"0d74b35e-570f-11f0-90c9-af8904a8491b","updated":"2025-07-06T08:20:58Z","title":"sweet eighteen","description":"this space is about ur birthday my puddingg dumplingg blueberryy","owner":{"id":"c656f7b4-562a-11f0-8fbe-eb767e9a6ee5","profilePictureUrl":"","username":"nikayla"},"nodes":[{"id":"328b2a17-1c0e-4afe-a0e7-7efe46c875b7","title":"","type":"IframeEmbed","xCoord":595.5917008166122,"yCoord":467.62908187547316,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":0,"url":"https://open.spotify.com/track/4MJYsDTjTVLk9oFYmlhPFP?si=k5WpAyXzSGWYEeQ27MJxHg"},{"id":"7301e7d5-f471-46d9-9c8e-e0d3d17b6790","title":"jn3dW3sV70oBCRU3zoo5png6f973SYlW13SQyuL0.jpg","type":"Image","xCoord":607,"yCoord":980,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":0,"content":"jn3dW3sV70oBCRU3zoo5png6f973SYlW13SQyuL0.jpg","url":"assets/7301e7d5-f471-46d9-9c8e-e0d3d17b6790.webp","width":284,"height":189},{"id":"eaabcd52-f735-48ec-a99a-e99586ac53a6","title":"open me!","type":"Text","xCoord":696.3113397825348,"yCoord":423.5253314697034,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":0,"content":"{\"content\":[{\"attrs\":{\"id\":\"63b004d4-18e7-4976-a791-2952d62549a6\"},\"content\":[{\"text\":\"HELLOWW MYY BLUEBERRYYY🫐\",\"type\":\"text\"}],\"type\":\"paragraph\"},{\"attrs\":{\"id\":\"9120b6a0-4b39-422b-b3c1-130047ca7630\"},\"content\":[{\"marks\":[{\"attrs\":{\"color\":null},\"type\":\"textColor\"}],\"text\":\"cannn u rememberrr whattt i said abtt thiss songg? ofc u rememberrr righttt?🫶\",\"type\":\"text\"}],\"type\":\"paragraph\"},{\"attrs\":{\"id\":\"3812a866-1a22-49a6-87b6-67bfae208f7c\"},\"content\":[{\"marks\":[{\"type\":\"italic\"}],\"text\":\"\\\"All at once everything looks different\",\"type\":\"text\"},{\"marks\":[{\"attrs\":{\"color\":null},\"type\":\"textColor\"},{\"type\":\"italic\"}],\"text\":\", now that I see you\\\"\",\"type\":\"text\"}],\"type\":\"paragraph\"},{\"attrs\":{\"id\":\"ce19f371-ccaa-4670-9296-dd0c9a7f50d5\"},\"content\":[{\"text\":\"i looveeee u theee mosttt \\u003c3\",\"type\":\"text\"}],\"type\":\"paragraph\"}],\"type\":\"doc\"}"},{"id":"e17cde78-c90e-476a-ba68-d18ccf948fee","title":"","type":"InlineText","xCoord":279.9748663726951,"yCoord":584.6251753328297,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":0,"content":"happy birthday sayanggkuu blueberryy, todayy ur agee issssss EIGHTEENN OMGGG!!\nsooo happyy, dedee syudahh dewasaa🫂🔞"},{"id":"8dbbe131-5bf1-49a9-a61b-96959b128372","title":"IMG_1258~2.JPG","type":"Image","xCoord":610.9607254542161,"yCoord":564.5632111169105,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":9,"content":"IMG_1258~2.JPG","url":"assets/8dbbe131-5bf1-49a9-a61b-96959b128372.webp","width":276,"height":208},{"id":"c4eae43b-8bc8-49bf-88ae-7144d9b25b53","title":"","type":"InlineText","xCoord":282.7876497341644,"yCoord":993.7200029640774,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":0,"content":"diii umurr kamuu yang ke 18 inii akuu berharap dan berdoaa semogaa kamu bisaa jadi pribadii yangg jauhh lebihh baikk lagii, panjangg umurr"},{"id":"1647d462-3764-44f5-a925-28f7c6406ab5","title":"","type":"InlineText","xCoord":280.20299759797336,"yCoord":782.193952560567,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":0,"content":"semoga kamu selalu sehat, segala urusan dan kuliah kamu dipermudah, diberi kecerdasan yang lebihh, n i wish kindness and happiness always come to u sayanggg!"},{"id":"5c648488-79c9-4bc4-86cd-c98bcb428c17","title":"17/4/25","type":"Text","xCoord":786.6408599334676,"yCoord":572.4267322341624,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":23,"content":"{\"content\":[{\"attrs\":{\"id\":\"29bbf93c-ea4e-4262-a9c1-e6d2163b33b2\"},\"content\":[{\"text\":\"ourr firsttt photo\",\"type\":\"text\"}],\"type\":\"paragraph\"},{\"attrs\":{\"id\":\"dfd955bf-f047-443f-9051-66a9d81d4a07\"},\"content\":[{\"text\":\"sayangg inii fotbarr pertamaa kitaa waktuu abis us harus harii kamiss setelahh fotoo sekelass dann inii mauu pulangg yangg dii manaa kitaa ngumpett\\\" bangett dan ada kesa nyempill HAHAHAHA. masa\\\" dii manaa kitaa cumann dekett biasaa ajaa tapii akuu pengenn punyaa fotoo barengg berduaa kamuu hihihi🤍\",\"type\":\"text\"}],\"type\":\"paragraph\"}],\"type\":\"doc\"}"},{"id":"25d0c5d5-c6e0-40ee-b11a-844fa5778a9c","title":"","type":"InlineText","xCoord":636.2344236746765,"yCoord":1194.056892832823,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":15,"content":"akuuu bangga bingbing sengg jadi milik kamuu, aku sayangg bangett samaa kamuu, timaacii yaa sayangg\ni lovee u infinityy🤍"},{"id":"7730405f-6ef0-4f8c-89cc-950df9dcb472","title":"IMG-20250624-WA0056.jpg","type":"Image","xCoord":283.99352405389925,"yCoord":1179.5147291599415,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":13,"content":"IMG-20250624-WA0056.jpg","url":"assets/7730405f-6ef0-4f8c-89cc-950df9dcb472.webp","width":300,"height":170},{"id":"5f256104-0fa3-45ec-8bb5-56455dcff9ce","title":"","type":"InlineText","xCoord":971.8559669138956,"yCoord":578.6164191622752,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":17,"content":"harus selaluu bahagiaa teruss yaa sayangg, maacii sayangg syudahh lahirr di duniaa dan sekarangg jadi milikk akuu, sangatt amatt bersyukur"},{"id":"d90346a1-a640-4146-9410-45b98c082126","title":"","type":"InlineText","xCoord":970.4071112984511,"yCoord":795.3567031505579,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":0,"content":"apapun yang terjadi di hidup kamuu dan apapun yang kamu rasainn, ajakk akuu kasii tauu akuu yaa sayangg, noo noo sendiriann karnaa kamuu syudahh punya akuu"},{"id":"45615b98-9beb-4219-8be2-6e729029689b","title":"","type":"InlineText","xCoord":969.1672386961429,"yCoord":990.0025683180285,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":0,"content":"once again, HAPPY BIRTHDAY SAYANGG HAPPY EIGHTEENN\nselalu sama sama ya sayangg, semogaa kitaa kuatt untuk menghadapi apapun proses dan rintangannya nantii \u003c3"},{"id":"c82a396e-90df-4acf-a322-1fee05f82180","title":"IMG-20250624-WA0057.jpg","type":"Image","xCoord":914.5834980837819,"yCoord":1179.711964805333,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":27,"content":"IMG-20250624-WA0057.jpg","url":"assets/c82a396e-90df-4acf-a322-1fee05f82180.webp","width":304,"height":172},{"id":"9a17a0fe-5dde-41ad-9414-d8b41f95e1c4","title":"","type":"Image","xCoord":226.63460597455628,"yCoord":442.6320204989988,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":21,"url":"assets/9a17a0fe-5dde-41ad-9414-d8b41f95e1c4.gif","width":350,"height":119},{"id":"5b1888a1-95ee-4d69-a82b-9802a33ac8a9","title":"","type":"Image","xCoord":935.087907503893,"yCoord":445.62759285946987,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":25,"url":"assets/5b1888a1-95ee-4d69-a82b-9802a33ac8a9.gif","width":346,"height":117},{"id":"4395f7d4-ac94-44ff-9d3a-0f924afb3719","title":"","type":"Image","xCoord":656.2353629509255,"yCoord":1314.740740180111,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":39,"url":"assets/4395f7d4-ac94-44ff-9d3a-0f924afb3719.gif","width":200,"height":200},{"id":"b0eee089-4eed-40e9-8964-db4c1b6c68cd","title":"27/4/25","type":"Text","xCoord":614.553224386555,"yCoord":793.4142834798955,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":37,"content":"{\"content\":[{\"attrs\":{\"id\":\"2d531605-9cdc-4e4b-9bd6-091a922f2466\"},\"content\":[{\"text\":\"refreshing after utbk...\",\"type\":\"text\"}],\"type\":\"paragraph\"},{\"attrs\":{\"id\":\"cc62c94e-b071-4e75-aa19-a3ca357d9223\"},\"content\":[{\"text\":\"dii foto ini juha photobooth pertama kitaa (sebenernya yang pertama si yang di gancit yaa) karnaa aku mau foto sama anak anak kucill, belomm apaa\\\" udahh photoboothh yaaa kerenn jugaa HAHAHAH\",\"type\":\"text\"}],\"type\":\"paragraph\"}],\"type\":\"doc\"}"},{"id":"73131e4b-b358-441c-98b9-7c278d422316","title":"cI33g3aviDtw2ggYOVbFU5S3c0gpCx1pjFz9llXM (1).jpg","type":"Image","xCoord":609.499936061665,"yCoord":785.9080748259547,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":35,"content":"cI33g3aviDtw2ggYOVbFU5S3c0gpCx1pjFz9llXM (1).jpg","url":"assets/73131e4b-b358-441c-98b9-7c278d422316.webp","width":279,"height":186},{"id":"e79ac82a-7bc0-4549-9271-635e73aade90","title":"15/5/25","type":"Text","xCoord":792.9204833196133,"yCoord":985.3285180982367,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":0,"content":"{\"content\":[{\"attrs\":{\"id\":\"ea098c4d-ea12-4fd2-9f7d-9a3cd29e9c0b\"},\"content\":[{\"text\":\"inii photobooth keduaa afterr officiall syudahh gaya sayangg\\\"an yaa HAHAHAHA. timaaciii yaa sayangg selaluuu mauu nunjukinn rasa sayang kamu ke akuu, bersyukur dan bahagiaa bingbingg akuu😘\",\"type\":\"text\"}],\"type\":\"paragraph\"}],\"type\":\"doc\"}"},{"id":"bc97f994-da4f-46be-af88-c30ec8e1c00b","title":"","type":"IframeEmbed","xCoord":915.832183346983,"yCoord":1367.7660720512777,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":43,"url":"https://open.spotify.com/track/3U4isOIWM3VvDubwSI3y7a?si=xztx-vJZTsGGmC5XaguexQ"},{"id":"12f6cc7e-cd57-474a-8ac7-cc039c5e3ffe","title":"","type":"IframeEmbed","xCoord":278.9535327676465,"yCoord":1365.7663596093823,"outgoingLinks":[],"incomingLinks":[],"childBlocks":null,"order":45,"url":"https://open.spotify.com/track/51lPx6ZCSalL2kvSrDUyJc?si=wfFmsYpeTdyL6qoNC8dyeA\u0026context=spotify%3Aplaylist%3A37i9dQZF1EJDCjaIrL1HGl"}],"spaceBlocks":[]}</script>
+  <script type="module">
+    import { h, render } from 'https://esm.sh/preact';
+    import { useState, useRef, useLayoutEffect } from 'https://esm.sh/preact/hooks';
+    import htm from 'https://esm.sh/htm';
+    const html = htm.bind(h);
+    const MIN_ZOOM = 0.1;
+    const MAX_ZOOM = 1.5;
+    const clamp = (v,min,max)=>Math.min(max,Math.max(min,v));
+    const ASSETS_PATH = "assets/";
+    function usePanZoom(wrapperRef, initialScale = 1, initialOffset = { x: 0, y: 0 }) {
+      const [scale, setScale] = useState(initialScale);
+      const [offset, setOffset] = useState(initialOffset);
+      const ptr = useRef(null);
+      // Allow external update of scale/offset
+      const setPanZoom = (newScale, newOffset) => {
+        setScale(newScale);
+        setOffset(newOffset);
+      };
+      const onPointerDown = (e) => {
+        ptr.current = {
+          id: e.pointerId,
+          x: e.clientX,
+          y: e.clientY,
+          start: { ...offset },
+        };
+        e.target.setPointerCapture(e.pointerId);
+      };
+      const onPointerMove = (e) => {
+        if (!ptr.current || e.pointerId !== ptr.current.id) return;
+        setOffset({
+          x: ptr.current.start.x + e.clientX - ptr.current.x,
+          y: ptr.current.start.y + e.clientY - ptr.current.y,
+        });
+      };
+      const onPointerUp = (e) => {
+        if (ptr.current && e.pointerId === ptr.current.id) {
+          e.target.releasePointerCapture(e.pointerId);
+          ptr.current = null;
+        }
+      };
+      const onWheel = (e) => {
+        e.preventDefault();
+        if (!wrapperRef.current) return;
+        const rect = wrapperRef.current.getBoundingClientRect();
+        const mx = e.clientX - rect.left,
+          my = e.clientY - rect.top;
+        const factor = 1 - 0.001 * e.deltaY;
+        const newScale = clamp(scale * factor, MIN_ZOOM, MAX_ZOOM);
+        const worldX = (mx - offset.x) / scale,
+          worldY = (my - offset.y) / scale;
+        const newOffset = { x: mx - worldX * newScale, y: my - worldY * newScale };
+        setScale(newScale);
+        setOffset(newOffset);
+      };
+      return { scale, offset, onPointerDown, onPointerMove, onPointerUp, onWheel, setPanZoom };
+    }
+    function Node({node,openSide}){
+      const style={left:`${node.xCoord}px`,top:`${node.yCoord}px`,zIndex:(node.order||0)+2};
+      const handleClick=()=>{if(node.type==='Text') openSide(node);} ;
+      switch(node.type){
+        case 'Text':
+          return html`<div class="node text-node" style=${style} onClick=${()=>openSide(node)}>
+            <svg class="w-3 h-3 mr-1.5 group-hover:rotate-20" viewBox="0 0 384 512" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right:8px;width:16px;height:16px;"><path d="M64 32C46.3 32 32 46.3 32 64V448c0 17.7 14.3 32 32 32H320c17.7 0 32-14.3 32-32V64c0-17.7-14.3-32-32-32H64zM0 64C0 28.7 28.7 0 64 0H320c35.3 0 64 28.7 64 64V448c0 35.3-28.7 64-64 64H64c-35.3 0-64-28.7-64-64V64zm80 64H304c8.8 0 16 7.2 16 16s-7.2 16-16 16H80c-8.8 0-16-7.2-16-16s7.2-16 16-16zm0 96H304c8.8 0 16 7.2 16 16s-7.2 16-16 16H80c-8.8 0-16-7.2-16-16s7.2-16 16-16zm0 96H208c8.8 0 16 7.2 16 16s-7.2 16-16 16H80c-8.8 0-16-7.2-16-16s7.2-16 16-16z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>
+            <span>${node.title||'Untitled'}</span>
+          </div>`;
+        case 'Image':
+          return html`<div class="node image-node" style=${style}><img src=${node.url} width=${node.width||200} height=${node.height||150} alt=${node.title} /></div>`;
+        case 'InlineText':
+          return html`<div class="node inline-text-node" style=${style}>${node.content||node.title}</div>`;
+        case 'WebLink': {
+          const og = node._openGraph || {};
+          const imageUrl = og.previewImageFileKey || "https://placehold.co/400x400";
+          const title = og.title || node.title || node.url || "Untitled";
+          const url = og.url || node.url || "#";
+          const favicon = og.faviconUrl;
+          let domain = "";
+          try {
+            domain = new URL(url).hostname.replace(/^www\./, "");
+          } catch {}
+          return html`
+            <a href=${url} target="_blank" rel="noopener" class="node weblink-node" style="left:${node.xCoord}px;top:${node.yCoord}px;z-index:${(node.order||0)+2};">
+              <img src=${imageUrl} alt=${title} class="preview" />
+              <div class="weblink-content">
+                <div class="weblink-title">${title}</div>
+                <div class="weblink-domain">
+                  ${favicon && html`<img src=${favicon} alt="favicon" class="weblink-favicon" />`}
+                  <span>${domain}</span>
+                </div>
+              </div>
+            </a>
+          `;
+        }
+        case 'IframeEmbed': {
+          // Use node.width/node.height if available, else fallback
+          const width = node.width || (node.url && node.url.includes('spotify.com') ? 320 : 400);
+          const height = node.height || (node.url && node.url.includes('spotify.com') ? 80 : 225);
+
+          let embed = null;
+          if (node.url) {
+            if (node.url.includes('youtube.com') || node.url.includes('youtu.be')) {
+              let videoId = '';
+              const ytMatch = node.url.match(/(?:youtube.com\/watch\?v=|youtu.be\/)([\w-]+)/);
+              if (ytMatch) videoId = ytMatch[1];
+              if (videoId) {
+                embed = html`<iframe width=${width} height=${height} src=${`https://www.youtube.com/embed/${videoId}`} frameborder="0" allowfullscreen></iframe>`;
+              }
+            } else if (node.url.includes('spotify.com')) {
+              // Robustly convert Spotify URLs to embed URLs
+              let embedUrl = node.url;
+              // Only transform if not already an embed URL
+              if (!/\/embed\//.test(embedUrl)) {
+                // Match /track/, /album/, /playlist/, etc.
+                const match = embedUrl.match(/https?:\/\/open\.spotify\.com\/(track|album|playlist|artist|episode|show)\/([a-zA-Z0-9]+)(\?.*)?/);
+                if (match) {
+                  embedUrl = `https://open.spotify.com/embed/${match[1]}/${match[2]}`;
+                }
+              }
+              embed = html`<iframe width=${width} height=${height} src=${embedUrl} frameborder="0" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"></iframe>`;
+            } else {
+              embed = html`<iframe width=${width} height=${height} src=${node.url} frameborder="0"></iframe>`;
+            }
+          }
+
+          const styleProp = {...style, width: width + 'px', height: height + 'px'}
+          return html`<div class="node iframe-node" style=${styleProp}>
+            ${embed || html`<div class="iframe-placeholder">Embed</div>`}
+          </div>`;
+        }
+        default:
+          return html`<div class="node" style=${style}>${node.title}</div>`;
+      }
+    }
+    function Connections({nodes}){
+      const map = new Map(nodes.map((n) => [n.id, n]));
+      const lines = [];
+      nodes.forEach((n) =>
+        n.outgoingLinks?.forEach((l) => {
+          const t = map.get(l.id);
+          if (t) lines.push([n, t]);
+        }),
+      );
+      return html`<svg class="connections">
+        ${lines.map(([a, b]) => {
+          const aw = a.width ?? 200,
+            ah = a.height ?? 150;
+          const bw = b.width ?? 200,
+            bh = b.height ?? 150;
+          const ax = a.xCoord + aw / 2,
+            ay = a.yCoord + ah / 2,
+            bx = b.xCoord + bw / 2,
+            by = b.yCoord + bh / 2;
+          return html`<line
+            x1=${ax}
+            y1=${ay}
+            x2=${bx}
+            y2=${by}
+            stroke="#888"
+            stroke-width="2"
+          />`;
+        })}
+      </svg>`;
+    }
+    // --- Tiptap/Legacy Renderer ---
+    function renderTiptap(node) {
+      if (!node) return null;
+      if (Array.isArray(node)) return node.map(renderTiptap);
+      switch (node.type) {
+        case 'doc':
+          return renderTiptap(node.content);
+        case 'paragraph':
+          return html`<p>${renderTiptap(node.content)}</p>`;
+        case 'heading': {
+          const level = node.attrs?.level || 1;
+          const tag = `h${level}`;
+          return h(tag, {}, renderTiptap(node.content));
+        }
+        case 'orderedList':
+          return html`<ol>${renderTiptap(node.content)}</ol>`;
+        case 'bulletList':
+          return html`<ul>${renderTiptap(node.content)}</ul>`;
+        case 'listItem':
+          return html`<li>${renderTiptap(node.content)}</li>`;
+        case 'text': {
+          let text = node.text;
+          if (node.marks) {
+            node.marks.forEach(mark => {
+              switch (mark.type) {
+                case 'bold': text = html`<b>${text}</b>`; break;
+                case 'italic': text = html`<i>${text}</i>`; break;
+                case 'underline': text = html`<u>${text}</u>`; break;
+                case 'highlight': text = html`<mark>${text}</mark>`; break;
+                case 'link':
+                  text = html`<a href=${mark.attrs?.href} target="_blank" rel="noopener">${text}</a>`;
+                  break;
+              }
+            });
+          }
+          return text;
+        }
+        case 'youtube': {
+          const src = node.attrs?.src;
+          const start = node.attrs?.start || 0;
+          let videoID = '';
+          if (src) {
+            if (src.includes('youtube.com')) {
+              const match = src.match(/[?&]v=([^&]+)/);
+              if (match) videoID = match[1];
+            } else if (src.includes('youtu.be/')) {
+              videoID = src.split('youtu.be/')[1].split(/[?&]/)[0];
+            }
+          }
+          if (videoID) {
+            const embedUrl = `https://www.youtube.com/embed/${videoID}?start=${start}`;
+            return html`<iframe width="560" height="315" src=${embedUrl} frameborder="0" allowfullscreen></iframe>`;
+          }
+          return null;
+        }
+        case 'weblink': {
+          const attrs = node.attrs || {};
+          const url = attrs.url || '#';
+          const title = attrs.title || url;
+          const description = attrs.description;
+          let domain = '';
+          try {
+            domain = new URL(url).hostname.replace(/^www\./, '');
+          } catch {}
+          return html`
+            <a href=${url} target="_blank" rel="noopener" class="tiptap-weblink">
+              <div class="tiptap-weblink-title">${title}</div>
+              ${description && html`<div class="tiptap-weblink-description">${description}</div>`}
+              <div class="tiptap-weblink-url">${url}</div>
+            </a>
+          `;
+        }
+        case 'image': {
+          const attrs = node.attrs || {};
+          const src = attrs.src;
+          const alt = attrs.alt || '';
+          const title = attrs.title || '';
+          if (src) {
+            return html`<img src=${src} alt=${alt} title=${title} class="tiptap-image" />`;
+          }
+          return null;
+        }
+        default:
+          return renderTiptap(node.content);
+      }
+    }
+    function renderLegacyBlocks(blocks) {
+      if (!blocks) return null;
+      // Helper to render styles
+      function renderStyledText(text, styles) {
+        let el = text;
+        if (styles) {
+          if (styles.bold) el = html`<b>${el}</b>`;
+          if (styles.italic) el = html`<i>${el}</i>`;
+          if (styles.underline) el = html`<u>${el}</u>`;
+          if (styles.backgroundColor) el = html`<span style=${`background-color:${styles.backgroundColor}`}>${el}</span>`;
+          if (styles.textColor) el = html`<span style=${`color:${styles.textColor}`}>${el}</span>`;
+        }
+        return el;
+      }
+      // Helper to render a block item (text, link, image, pdf, youtube, weblink)
+      function renderBlockItem(item) {
+        if (!item) return null;
+        if (item.type === 'text') {
+          return renderStyledText(item.text, item.styles);
+        } else if (item.type === 'link') {
+          // Render link content recursively if present
+          let content = item.content ? item.content.map(renderBlockItem) : item.href;
+          return html`<a href=${item.href} target="_blank" rel="noopener">${content}</a>`;
+        } else if (item.type === 'image' || item.imageSrc) {
+          const src = item.imageSrc || item.src;
+          return html`<img src=${src} alt="" style="max-width:100%;margin:8px 0;" />`;
+        } else if (item.type === 'pdf' || item.pdfFileKey) {
+          // Render as a link to the PDF file
+          const file = item.pdfFileKey || item.fileKey;
+          return html`<a href=${file} target="_blank" rel="noopener" style="display:block;margin:8px 0;color:#0074d9;">PDF: ${file}</a>`;
+        } else if (item.type === 'youtube' || item.youtubeSrc) {
+          // Accept both video ID and full URL
+          let videoId = item.youtubeSrc;
+          if (videoId && videoId.startsWith('http')) {
+            const match = videoId.match(/[?&]v=([^&]+)/);
+            if (match) videoId = match[1];
+          }
+          if (videoId) {
+            return html`<iframe width="400" height="225" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allowfullscreen style="margin:8px 0;"></iframe>`;
+          }
+        } else if (item.type === 'weblink' || item.url) {
+          // Render a weblink preview
+          const url = item.url;
+          const title = item.title || url;
+          const description = item.description;
+          const previewImage = item.previewImageFileKey;
+          const favicon = item.faviconUrl;
+          let domain = '';
+          try { domain = new URL(url).hostname.replace(/^www\./, ''); } catch {}
+          return html`<a href=${url} target="_blank" rel="noopener" class="tiptap-weblink">
+            ${previewImage && html`<img src=${previewImage} alt="preview" style="width:100%;max-width:320px;max-height:120px;object-fit:cover;border-radius:8px 8px 0 0;" />`}
+            <div class="tiptap-weblink-title">${title}</div>
+            ${description && html`<div class="tiptap-weblink-description">${description}</div>`}
+            <div class="tiptap-weblink-url">${url}</div>
+            ${favicon && html`<img src=${favicon} alt="favicon" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;" />`}<span>${domain}</span>
+          </a>`;
+        }
+        return null;
+      }
+      // Flatten blockData to array of items, handling both array and object
+      function flattenBlockData(blockData) {
+        if (!blockData) return [];
+        if (typeof blockData === 'string') {
+          try {
+            const parsed = JSON.parse(blockData);
+            if (Array.isArray(parsed)) return parsed;
+            else return [parsed];
+          } catch {
+            // Not JSON, treat as plain text
+            return [{ type: 'text', text: blockData }];
+          }
+        } else if (Array.isArray(blockData)) {
+          return blockData;
+        } else if (blockData) {
+          return [blockData];
+        }
+        return [];
+      }
+      // Detect if a block is a heading or list
+      function isHeadingBlock(items) {
+        if (!items) return false;
+        if (Array.isArray(items)) return items.some(i => i.isHeading);
+        return !!items.isHeading;
+      }
+      function isBulletListBlock(items) {
+        if (!items) return false;
+        if (Array.isArray(items)) return items.some(i => i.isBulletListItem);
+        return !!items.isBulletListItem;
+      }
+      function isOrderedListBlock(items) {
+        if (!items) return false;
+        if (Array.isArray(items)) return items.some(i => i.isNumberedListItem);
+        return !!items.isNumberedListItem;
+      }
+      // Group consecutive list items
+      function groupListBlocks(blocks) {
+        const result = [];
+        let currentList = null;
+        let currentType = null;
+        blocks.forEach(b => {
+          const items = flattenBlockData(b.blockData);
+          if (isBulletListBlock(items)) {
+            if (currentType !== 'ul') {
+              if (currentList) result.push(currentList);
+              currentList = { type: 'ul', items: [] };
+              currentType = 'ul';
+            }
+            currentList.items.push(items);
+          } else if (isOrderedListBlock(items)) {
+            if (currentType !== 'ol') {
+              if (currentList) result.push(currentList);
+              currentList = { type: 'ol', items: [] };
+              currentType = 'ol';
+            }
+            currentList.items.push(items);
+          } else {
+            if (currentList) {
+              result.push(currentList);
+              currentList = null;
+              currentType = null;
+            }
+            result.push(b);
+          }
+        });
+        if (currentList) result.push(currentList);
+        return result;
+      }
+      // Main render
+      const grouped = groupListBlocks(blocks);
+      return grouped.map(b => {
+        if (b.type === 'ul' || b.type === 'ol') {
+          const Tag = b.type;
+          return html`<${Tag}>${b.items.map(items => html`<li>${items.map(renderBlockItem)}</li>`)}</${Tag}>`;
+        } else {
+          // Not a grouped list, render as normal
+          let blockData = b.blockData;
+          let items = flattenBlockData(blockData);
+          if (isHeadingBlock(items)) {
+            // Render as heading (default h3)
+            return html`<h3>${Array.isArray(items) ? items.map(renderBlockItem) : renderBlockItem(items)}</h3>`;
+          }
+          // If only one item and it's a block type (image, pdf, youtube, weblink), render as block
+          if (items.length === 1) {
+            const item = items[0];
+            if (["image","pdf","youtube","weblink"].includes(item.type) || item.imageSrc || item.pdfFileKey || item.youtubeSrc || item.url) {
+              return renderBlockItem(item);
+            }
+          }
+          // Otherwise, render as paragraph
+          return html`<div>${items.map(renderBlockItem)}</div>`;
+        }
+      });
+    }
+    function renderTextNodeContent(node) {
+      if (!node) return null;
+      // Try Tiptap JSON
+      if (node.content) {
+        try {
+          const doc = JSON.parse(node.content);
+          if (doc && typeof doc === 'object' && doc.type) {
+            const rendered = renderTiptap(doc);
+            if (rendered) return rendered;
+          }
+        } catch {}
+      }
+      // Legacy blocks
+      if (node.childBlocks && node.childBlocks.length > 0) {
+        const rendered = renderLegacyBlocks(node.childBlocks);
+        if (rendered) return rendered;
+      }
+      // Fallback: pre
+      if (node.content) {
+        return html`<pre>${node.content}</pre>`;
+      }
+      // Empty state
+      return html`<div class="empty-note-helper">This note is empty</div>`;
+    }
+    function Sidebar({node,onClose}){
+      if(!node) return null;
+      return html`<div class="sidebar-overlay" onClick=${onClose}>
+        <div class="sidebar" onClick=${e=>e.stopPropagation()}>
+          <button class="close-btn" aria-label="Close" onClick=${onClose}>✕</button>
+          <h2>${node.title}</h2>
+          ${node.type === 'Text' ? renderTextNodeContent(node) : html`<p>${node.content||'No content yet.'}</p>`}
+        </div>
+      </div>`;
+    }
+    function App(){
+      const space=JSON.parse(document.getElementById('space-data').textContent);
+      const ext = space.nodes.reduce(
+        (acc, n) => {
+          const w = n.width ?? 200;
+          const h = n.height ?? 150;
+          acc.minX = Math.min(acc.minX, n.xCoord);
+          acc.minY = Math.min(acc.minY, n.yCoord);
+          acc.maxX = Math.max(acc.maxX, n.xCoord + w);
+          acc.maxY = Math.max(acc.maxY, n.yCoord + h);
+          return acc;
+        },
+        { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity },
+      );
+      const baseW = Math.max(ext.maxX + 100, 800);
+      const baseH = Math.max(ext.maxY + 100, 600);
+      const wrapperRef = useRef(null);
+      // Start with scale 1 and offset 0, will update after mount
+      const {scale, offset, onPointerDown, onPointerMove, onPointerUp, onWheel, setPanZoom}=usePanZoom(wrapperRef, 1, {x:0, y:0});
+      const [sidebarNode, setSidebarNode]=useState(null);
+      const [showInfo, setShowInfo]=useState(false);
+
+      // Center and fit content on initial mount
+      useLayoutEffect(() => {
+        if (!wrapperRef.current || !isFinite(ext.minX) || !isFinite(ext.minY)) return;
+        const rect = wrapperRef.current.getBoundingClientRect();
+        const contentW = ext.maxX - ext.minX;
+        const contentH = ext.maxY - ext.minY;
+        // Add margin (25%)
+        const margin = 0.25;
+        const fitW = rect.width * (1 - margin);
+        const fitH = rect.height * (1 - margin);
+        const scaleX = fitW / contentW;
+        const scaleY = fitH / contentH;
+        let newScale = Math.min(scaleX, scaleY, MAX_ZOOM);
+        newScale = clamp(newScale, MIN_ZOOM, MAX_ZOOM);
+        // Center the content
+        const offsetX = (rect.width - contentW * newScale) / 2 - ext.minX * newScale;
+        const offsetY = (rect.height - contentH * newScale) / 2 - ext.minY * newScale;
+        setPanZoom(newScale, { x: offsetX, y: offsetY });
+      }, [wrapperRef.current, ext.minX, ext.minY, ext.maxX, ext.maxY]);
+
+      const spaceTitle = space.title || 'Space';
+      document.title = spaceTitle;
+
+      return html`
+        <!-- UI -->
+        <div class="ui-layer">
+          <div class="ui-logo-box">
+            <img src="${ASSETS_PATH}logo.png" class="ui-logo" alt="Logo" />
+          </div>
+          <div class="ui-info-card">
+            <div class="ui-info-header">
+              <span class="ui-username">${space.owner?.username || 'user'}</span>
+            </div>
+            <div class="ui-space-title">${spaceTitle}</div>
+            <div class="ui-space-desc">${space.description}</div>
+          </div>
+        </div>
+        <!-- Canvas -->
+        <div class="canvas-wrapper" ref=${wrapperRef} onPointerDown=${onPointerDown} onPointerMove=${onPointerMove} onPointerUp=${onPointerUp} onWheel=${onWheel}>
+          <div class="canvas-content" style=${`--tx:${offset.x}px;--ty:${offset.y}px;--scale:${scale};width:${baseW}px;height:${baseH}px;`}>
+            ${space.nodes.map(n=>html`<${Node} key=${n.id} node=${n} openSide=${setSidebarNode} />`)}
+            ${Connections({nodes:space.nodes})}
+          </div>
+        </div>
+        <!-- Sidebar -->
+        ${Sidebar({node:sidebarNode,onClose:()=>setSidebarNode(null)})}
+      `;
+    }
+    render(html`<${App}/>`,document.getElementById('app'));
+  </script>
+</body>
+</html> 
